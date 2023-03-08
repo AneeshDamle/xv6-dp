@@ -1,0 +1,77 @@
+===============================================================================
+Abhijit's take on the project:
+===============================================================================
+Implement demand paging in xv6
+- invalid entry may have 2 meanings - page is out of range of addresses, 
+                                      or not in memory
+- implement backing store, requires knowing disk IO, maybe add one more disk
+- devise a scheme for mapping pages to backing store
+- write functions to do I/O for pages - will use disk driver code (exists)
+- (IMP) restart of an instruction - this will necessiate a deeper study of x86
+  instructions
+- modify the frame allocation to some extent - ensure minimum frames for a
+  process
+- Ideally should be implemented such that:
+    - the pages of a process get mapped identically with the way the file data
+      in operating systems gets mapped
+    - i.e. unified page cache - single way of handling mmap and buffers of
+      files --> IGNORE
+    - will be challenging, but if done, nothing better than this for learning
+      number of OS concepts
+
+===============================================================================
+Notes from Abhijit Sir
+===============================================================================
+
+Demand paging
+----
+Spend little time reading x86 documentation to understand PTE flags!
+let's say you will do pure demand paging.
+
+Modify all the code in vm.c that sets up page table mappings to NOT TO ALLOCATE any frame, and make a PT entry that is invalid!.
+
+Which hardware interrupt?  
+need to read more about interrupt handling in xv6 , available in the xv6 book, on how to get a new hardware interrupt number. 
+
+Then you add an option in trap()
+the handler function will be your demand pager.
+
+pager:
+Allocate a frame (assume a very simple replacement algo) 
+//then issue a read . HOW? How to determine what the PF was for?
+to take the above decision, maintain may be additional information in struct proc! 
+If it's the code, then you need to call readi() on inode of the executable 
+If it's the heap/stack, etc: You need to call readbackingstore();
+Update the page table;
+RESUME the process! 
+
+readbackingstore():
+	needs to call the DD
+	requires a third disk! 
+
+xv6 DD supports only 2 disks as of now!
+Modify the xv6 DD - I will tell you how to do that!
+
+===============================================================================
+My own understanding
+===============================================================================
+- Whenever a process has to run, all of its code is loaded in the RAM from
+  disk, in the form of pages.
+- This is inefficient as most of the code isn't needed on processor right now
+- Hence, best way would be including only pages that are needed.
+- This is demand paging.
+
+Q. How to implement demand paging?
+- Consider that a process is selected to run by scheduler.
+- While loading the process, only some first pages are loaded
+- Here, in the process's page table, a page can have valid/invalid flag:
+  a. valid bit: page is for process and is loaded in RAM
+  b. invalid bit: either page is not of process's virtual memory, or is but
+  isn't loaded
+- So, if the process wants to access a page that isn't loaded, a "page fault"
+  will occur.
+  - This is treated as a trap (and we already have a trap-handle)!
+    And we will need a new interrupt handler to handle "this" new trap option.
+
+NOTE: pure demand paging: never bring a page into memory until it is required.
+
