@@ -53,9 +53,14 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
+    /* We should not load pages, just make page table entries
     if(loaduvm(pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
       goto bad;
+    */
+
+    cprintf("ph.vaddr: %d\nph.memsiz: %d\n", ph.vaddr, ph.memsz);
   }
+
   iunlockput(ip);
   end_op();
   ip = 0;

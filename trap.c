@@ -77,6 +77,18 @@ trap(struct trapframe *tf)
             cpuid(), tf->cs, tf->eip);
     lapiceoi();
     break;
+  case T_PGFLT:
+    cprintf("Page fault in process: %s\n", myproc()->name);
+    /* TODO:
+     * cr2 register holds the virtual address for which page fault occurred
+     * check its page table entry
+     * load that page table
+     * and execute the same instruction which caused the page fault again
+     */
+    //TODO: something about page faults, do we must
+    cprintf("%s\n", myproc()->name);
+    panic("I AM Your FATHER!!!!\n");
+    break;
 
   //PAGEBREAK: 13
   default:
