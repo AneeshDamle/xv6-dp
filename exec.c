@@ -40,6 +40,7 @@ exec(char *path, char **argv)
 
   // Load program into memory.
   sz = 0;
+
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
       goto bad;
@@ -57,7 +58,10 @@ exec(char *path, char **argv)
     if(loaduvm(pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
       goto bad;
     */
+
+    cprintf("ph.vaddr: %d\nph.memsiz: %d\n", ph.vaddr, ph.memsz);
   }
+
   iunlockput(ip);
   end_op();
   ip = 0;

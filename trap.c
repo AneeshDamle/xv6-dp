@@ -85,9 +85,9 @@ trap(struct trapframe *tf)
      * load that page table
      * and execute the same instruction which caused the page fault again
      */
-    // TODO: handle_page_fault();
-    cprintf("cr2: %d\n", rcr2());
-    panic("hello there");
+    //TODO: something about page faults, do we must
+    cprintf("%s\n", myproc()->name);
+    panic("I AM Your FATHER!!!!\n");
     break;
 
   //PAGEBREAK: 13
