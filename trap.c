@@ -8,6 +8,8 @@
 #include "traps.h"
 #include "spinlock.h"
 
+#include "demand_paging.h"
+
 // Interrupt descriptor table (shared by all CPUs).
 struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
@@ -79,15 +81,10 @@ trap(struct trapframe *tf)
     break;
   case T_PGFLT:
     cprintf("Page fault in process: %s\n", myproc()->name);
-    /* TODO:
-     * cr2 register holds the virtual address for which page fault occurred
-     * check its page table entry
-     * load that page table
-     * and execute the same instruction which caused the page fault again
-     */
-    //TODO: something about page faults, do we must
-    cprintf("%s\n", myproc()->name);
-    panic("I AM Your FATHER!!!!\n");
+    cprintf("EIP: %d\n", myproc()->tf->eip);
+    cprintf("CR2: %d\n", rcr2());
+    if (handle_page_fault(rcr2()) != 0)
+      panic("Hello there\n");
     break;
 
   //PAGEBREAK: 13
