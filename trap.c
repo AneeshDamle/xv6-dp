@@ -80,15 +80,10 @@ trap(struct trapframe *tf)
     lapiceoi();
     break;
   case T_PGFLT:
-    cprintf("Page fault in process: %s\n", myproc()->name);
-    cprintf("CR2: %d\n", rcr2());
-  cprintf("vaddr: %d\n", myproc()->vaddr);
-    cprintf("filesz: %d\n", myproc()->filesz);
-    cprintf("path: %s\n", myproc()->path);
-    cprintf("pgdir: %x\n", myproc()->pgdir);
-    cprintf("entering handler\n");
+    /* cr2 register stores the virtual address at which page fault occurred */
+    cprintf("Page fault: %s at virtual address: %x\n", myproc()->name, rcr2());
     if (handle_page_fault(rcr2()) != 0)
-      panic("Hello there\n");
+      panic("page fault handler\n");
     break;
 
   //PAGEBREAK: 13

@@ -57,16 +57,11 @@ exec(char *path, char **argv)
     /* We should not load pages, just make page table entries
     if(loaduvm(pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
       goto bad;*/
-    //cprintf("ph.vaddr: %d\nph.memsiz: %d\n", ph.vaddr, ph.memsz);
   }
 
   iunlockput(ip);
   end_op();
   ip = 0;
-
-  curproc->vaddr = ph.vaddr;
-  curproc->filesz = ph.filesz;
-  curproc->off = ph.off;
 
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
@@ -100,7 +95,6 @@ exec(char *path, char **argv)
     if(*s == '/')
       last = s+1;
   safestrcpy(curproc->name, last, sizeof(curproc->name));
-  safestrcpy(curproc->path, path, sizeof(curproc->path));
 
   // Commit to the user image.
   oldpgdir = curproc->pgdir;
@@ -108,6 +102,12 @@ exec(char *path, char **argv)
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
+
+  safestrcpy(curproc->path, path, sizeof(curproc->path));
+  curproc->vaddr = ph.vaddr;
+  curproc->filesz = ph.filesz;
+  curproc->off = ph.off;
+
   switchuvm(curproc);
   freevm(oldpgdir);
   return 0;
