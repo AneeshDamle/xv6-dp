@@ -10,75 +10,71 @@
 #include "demand_paging.h"
 
 int handle_page_fault(uint reqd_pgaddr) {
-  struct inode *ip;
   struct proc *curproc = myproc();
-  cprintf("Process: %s\n", curproc->name);
-  struct elfhdr elf;
-  struct proghdr ph;
+  cprintf("Handle process: %s\n", curproc->name);
+  cprintf("vaddr: %d\n", curproc->vaddr);
+    cprintf("filesz: %d\n", curproc->filesz);
+    cprintf("path: %s\n", curproc->path);
+    cprintf("pgdir: %x\n", curproc->pgdir);
+    cprintf("Before\n");
   int i, off;
   pde_t *pgdir;
+  struct inode *ip;
 
   /* cr2 register stores the virtual address at which page fault occurred */
   reqd_pgaddr = PGROUNDDOWN(reqd_pgaddr);
   pgdir = curproc->pgdir;
-  cprintf("Proc usz before load: %d\n", curproc->usz);
-  cprintf("Reqd PGADDR: %d\n", reqd_pgaddr);
-  cprintf("Proc sz: %d\n", curproc->sz);
 
   begin_op();
 
-  if((ip = namei(curproc->name)) == 0){
+  if((ip = namei(curproc->path)) == 0){
     end_op();
     cprintf("exec: fail\n");
     return -1;
   }
-  ilock(ip);
 
-  // Check ELF header
-  if(readi(ip, (char*)&elf, 0, sizeof(elf)) != sizeof(elf))
-    goto bad;
-  if(elf.magic != ELF_MAGIC)
-    goto bad;
-
-  for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
-    if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph)) {
-      goto bad;
-    }
-    if(ph.type != ELF_PROG_LOAD) {
-      continue;
-    }
-    if(ph.memsz < ph.filesz) {
-      goto bad;
-    }
-    if(ph.vaddr + ph.memsz < ph.vaddr) {
-      goto bad;
-    }
-    if(ph.vaddr % PGSIZE != 0) {
-      goto bad;
-    }
-    /* main condition */
-    if (reqd_pgaddr >= ph.vaddr && reqd_pgaddr < ph.vaddr + ph.filesz) {
-      if (reqd_pgaddr + PGSIZE > ph.memsz) {
-        if((curproc->usz = allocuvm(pgdir, curproc->usz, ph.memsz)) == 0)
-          goto bad;
-      } else {
-        if((curproc->usz = allocuvm(pgdir, curproc->usz, reqd_pgaddr + PGSIZE)) == 0)
-          goto bad;
-      }
-      if (reqd_pgaddr + PGSIZE > ph.filesz) {
-        if(loaduvm(pgdir, (char*)reqd_pgaddr, ip, ph.off, ph.filesz - reqd_pgaddr) < 0)
-          goto bad;
-      } else {
-        if(loaduvm(pgdir, (char*)reqd_pgaddr, ip, ph.off, PGSIZE) < 0)
-          goto bad;
-      }
-      cprintf("Page loaded: %d\n", curproc->usz);
-      iunlockput(ip);
-      end_op();
+  /* condition: ELF */
+  if (reqd_pgaddr >= curproc->vaddr && reqd_pgaddr < curproc->vaddr + curproc->filesz) {
+    /* create a page table */
+    char *mem = kalloc();
+    memset(mem, 0, PGSIZE);
+    // TODO: Inspect "size" param of mappages
+    if(mappages(pgdir, (char*)reqd_pgaddr, 1, V2P(mem), PTE_W|PTE_U) < 0){
+      cprintf("Couldn't alloc page table on PG_FLT\n");
+      //deallocuvm(pgdir, newsz, oldsz);
+      kfree(mem);
       return 0;
     }
+    /* load the page: create a page */
+    pte_t *pte;
+    uint pa;
+    if((pte = walkpgdir(pgdir, reqd_pgaddr, 0)) == 0)
+      panic("pgflt address should exist");
+    pa = PTE_ADDR(*pte);
+    uint load_size;
+    if (reqd_pgaddr + PGSIZE > curproc->filesz) {
+        load_size = curproc->filesz - reqd_pgaddr;
+    } else {
+        load_size = PGSIZE;
+    }
+    ilock(ip);
+    if(readi(ip, P2V(pa), curproc->off + reqd_pgaddr, load_size) != load_size)
+      return -1;
+
+    cprintf("Page loaded\n");
+    cprintf("filesz: %d\n", curproc->filesz);
+    cprintf("path: %s\n", curproc->path);
+    cprintf("pgdir: %x\n", curproc->pgdir);
+    iunlockput(ip);
+    end_op();
+    return 0;
   }
-  iunlockput(ip);
+
+  cprintf("filesz: %d\n", curproc->filesz);
+  cprintf("path: %s\n", curproc->path);
+  cprintf("vaddr: %d\n", curproc->vaddr);
+  cprintf("pgdir: %x\n", curproc->pgdir);
+
   end_op();
   return 1;
 

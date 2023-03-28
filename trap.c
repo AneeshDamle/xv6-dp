@@ -81,8 +81,12 @@ trap(struct trapframe *tf)
     break;
   case T_PGFLT:
     cprintf("Page fault in process: %s\n", myproc()->name);
-    cprintf("EIP: %d\n", myproc()->tf->eip);
     cprintf("CR2: %d\n", rcr2());
+  cprintf("vaddr: %d\n", myproc()->vaddr);
+    cprintf("filesz: %d\n", myproc()->filesz);
+    cprintf("path: %s\n", myproc()->path);
+    cprintf("pgdir: %x\n", myproc()->pgdir);
+    cprintf("entering handler\n");
     if (handle_page_fault(rcr2()) != 0)
       panic("Hello there\n");
     break;
