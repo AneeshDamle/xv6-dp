@@ -53,6 +53,7 @@ struct proc {
   uint vaddr;
   uint filesz;
   uint off;
+  uint stackend;
   char path[16];               // Process path name
 };
 
