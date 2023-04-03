@@ -55,6 +55,7 @@ struct proc {
   uint off;
   uint stackend;
   char path[16];               // Process path name
+  struct inode *elfip;
 };
 
 // Process memory is laid out contiguously, low addresses first:
