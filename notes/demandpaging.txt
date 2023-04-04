@@ -75,3 +75,53 @@ Q. How to implement demand paging?
 
 NOTE: pure demand paging: never bring a page into memory until it is required.
 
+===============================================================================
+BACKING STORE DISCUSSIONS
+===============================================================================
+Now, we have implemented page fault handler for handling normal ELF loads
+
+Q. What to do when the RAM is full?
+- Select a victim page from RAM
+- Write this victim page to the backing store, and add the free frame to
+  kmem.freelist
+- Then, kalloc() should return the same page
+
+Q1. How to select a victim page?
+- We are implementing demand paging only for user processes
+- So, we only have to deal with pages of those physical addresses
+  i.e. PHYSTOP to DEVSPACE
+- We'll implement a preliminary random allocator:), and get a physical page
+  address randomly (using randint ;)
+- NOTE: Any user process page could be selected (Stack/Heap/Code/Data)
+
+Q2. How to write it to the backing store?
+- We should maintain a list of "free pages in BS" in Kernel Memory
+- Take out the first free page, disk I/O will write a page to the BS
+- Update the free list, and also the process's mmuinfo
+
+Process's "mmuinfo":
+Table of every process's user page mapped
+--------------------
+| 0 | BS  | page 3 |
+--------------------
+| 1 | RAM |        |
+--------------------
+| 2 | ELF |        |
+--------------------
+| 3 | BS  | page 7 |
+--------------------
+| ...              |
+--------------------
+
+Q3. How to read on a page fault?
+- We first check whether the page fault is on a stack/heap (HOW TO ?), or
+  code/data.
+- If it's on code/data, find a free frame, then check if page content is on backing
+  store OR not, and load it respectively from BS(readbackingstore) or
+  ELF(readi - already written)
+- If it's on stack/heap, find a free frame, blab-blah-blah, and ? (ASK SIR)
+
+
+Further Optimizations: Modified bit for deciding to store/not in BS
+                       LRU DLL for optimised page replacement algo
+
