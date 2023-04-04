@@ -35,14 +35,6 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
-enum pagestate { RAM, ELF, BS };
-
-// Per-process MMU information table entry
-struct mmuinfo {
-    enum pagestate pgwhere;
-    int bswhere;
-};
-
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
@@ -64,7 +56,8 @@ struct proc {
   uint off;
   char path[16];               // Process path name
   struct inode *elfip;
-  struct mmuinfo mmuinfo[KERNBASE / PGSIZE]
+  uint bsarray[PGSIZE/8][2];
+  uint bsarray_end;
 };
 
 // Process memory is laid out contiguously, low addresses first:
