@@ -104,10 +104,27 @@ exec(char *path, char **argv)
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
 
-  safestrcpy(curproc->path, path, sizeof(curproc->path));
   curproc->vaddr = ph.vaddr;
   curproc->filesz = ph.filesz;
   curproc->off = ph.off;
+  safestrcpy(curproc->path, path, sizeof(curproc->path));
+  /* Initialising mmuinfo */
+  for (i = 0; i < KERNBASE / PGSIZE; ++i) {
+      curproc->mmuinfo[i].bswhere = -1;
+  }
+  /* ELF */
+  for (i = 0; i < PGROUNDUP(curproc->filesz) / PGSIZE; ++i) {
+      curproc->mmuinfo[i].pgwhere = ELF;
+  }
+  /* Guard page */
+  curproc->mmuinfo[i].pgwhere = RAM;
+  i++;
+  /* Stack page */
+  curproc->mmuinfo[i].pgwhere = RAM;
+  i++;
+  for (i; i < (KERNBASE / PGSIZE); ++i) {
+      curproc->mmuinfo[i].pgwhere = RAM;
+  }
 
   switchuvm(curproc);
   freevm(oldpgdir);

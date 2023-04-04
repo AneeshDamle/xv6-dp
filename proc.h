@@ -1,3 +1,4 @@
+#include "memlayout.h"
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -34,6 +35,14 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+enum pagestate { RAM, ELF, BS };
+
+// Per-process MMU information table entry
+struct mmuinfo {
+    enum pagestate pgwhere;
+    int bswhere;
+};
+
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
@@ -53,9 +62,9 @@ struct proc {
   uint vaddr;
   uint filesz;
   uint off;
-  uint stackend;
   char path[16];               // Process path name
   struct inode *elfip;
+  struct mmuinfo mmuinfo[KERNBASE / PGSIZE]
 };
 
 // Process memory is laid out contiguously, low addresses first:
