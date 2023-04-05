@@ -71,6 +71,8 @@ int handle_page_fault(uint reqd_pgaddr) {
     if (i < curproc->bsarray_end) {
         /* TODO: Could optimise to reuse read swapping space */
         read_backingstore(curproc->bsarray[i][1], P2V(curproc->bsarray[i][0]));
+        curproc->bsarray[i][0] == -1;
+        curproc->bsarray[i][1] == -1;
         return 0;
     }
     /* Condition : ELF */
