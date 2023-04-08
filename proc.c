@@ -228,7 +228,6 @@ void
 exit(void)
 {
   struct proc *curproc = myproc();
-  cprintf("Which proc? %s\n", curproc->name);
   struct proc *p;
   int fd;
 
