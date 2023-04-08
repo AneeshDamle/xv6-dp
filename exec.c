@@ -50,12 +50,12 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr + ph.memsz < ph.vaddr)
       goto bad;
-    /*if((sz = allocuvm(pgdir, sz, ph.vaddr + ph.memsz)) == 0)
-      goto bad;*/
+    if((sz = allocuvm(pgdir, sz, ph.vaddr + ph.memsz)) == 0)
+      goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
     sz = ph.vaddr + ph.memsz;
-    /* We should not load pages, just make page table entries
+    /* We should not load pages
     if(loaduvm(pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
       goto bad;*/
   }
@@ -69,6 +69,16 @@ exec(char *path, char **argv)
   sz = PGROUNDUP(sz);
   if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
     goto bad;
+  /* allocate 2 pages for stack and guard */
+  // TODO: Error checking
+  int j;
+  for (j = 0; j < 2; j++) {
+    char *mem = kalloc();
+    memset(mem, 0, PGSIZE);
+    pte_t *pte = walkpgdir(pgdir, sz, 1);
+    *pte = V2P(mem) | PTE_W | PTE_U | PTE_P;
+    sz += PGSIZE;
+  }
   clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
   sp = sz;
 
@@ -108,7 +118,6 @@ exec(char *path, char **argv)
   curproc->filesz = ph.filesz;
   curproc->off = ph.off;
   safestrcpy(curproc->path, path, sizeof(curproc->path));
-  curproc->bsarray_end = 0;
 
   switchuvm(curproc);
   freevm(oldpgdir);
