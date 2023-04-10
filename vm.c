@@ -380,7 +380,6 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
     va0 = (uint)PGROUNDDOWN(va);
     pa0 = uva2ka(pgdir, (char*)va0);
     if(pa0 == 0) {
-      cprintf("BAD Hello there\n");
       return -1;
     }
     n = PGSIZE - (va - va0);
