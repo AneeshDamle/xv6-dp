@@ -532,3 +532,40 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+/* Determine which process the given physical address belongs to,
+ * and return its PID and VA
+ * param[in]: physical address
+ * retval: struct of pid, va attributes
+ */
+void get_pa_procinfo(uint pa, int *pid, uint *vaddr) {
+    struct proc *p;
+    int va;
+    pte_t *pte;
+
+    acquire(&ptable.lock);
+
+    *pid = -1;
+    *vaddr = 0;
+    // For each process, check if given pa exists
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state == UNUSED)
+            continue;
+        for (va = 0; va < KERNBASE; va += PGSIZE) {
+            if ((pte = walkpgdir(p->pgdir, va, 0) != 0)) {
+                if (PTE_ADDR(*pte) == pa) {
+                    *pid = p->pid;
+                    *vaddr = va;
+                    break;
+                }
+            }
+        }
+    }
+    if (*pid == -1) {
+        release(&ptable.lock);
+        panic("physical address matches no process\n");
+    }
+    release(&ptable.lock);
+    return;
+}
+
