@@ -19,6 +19,11 @@ exec(char *path, char **argv)
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
 
+  uint vaddr;
+  uint filesz;
+  uint offset;
+  struct inode *elfip;
+
   begin_op();
 
   if((ip = namei(path)) == 0){
@@ -41,6 +46,8 @@ exec(char *path, char **argv)
 
   // Load program into memory.
   sz = 0;
+  vaddr = 1;
+  filesz = 0;
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
       goto bad;
@@ -54,7 +61,11 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
-    sz = ph.vaddr + ph.memsz;
+    sz = (sz > (ph.vaddr + ph.memsz)) ? sz : (ph.vaddr + ph.memsz);
+    vaddr = (vaddr <= ph.vaddr) ? vaddr : ph.vaddr;
+    filesz = (filesz >= ph.filesz) ? filesz : ph.filesz;
+    if (filesz == ph.filesz)
+        offset = ph.off;
     /* We should not load pages
     if(loaduvm(pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
       goto bad;*/
@@ -114,10 +125,9 @@ exec(char *path, char **argv)
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
 
-  curproc->vaddr = ph.vaddr;
-  curproc->filesz = ph.filesz;
-  curproc->off = ph.off;
-  safestrcpy(curproc->path, path, sizeof(curproc->path));
+  curproc->vaddr = vaddr;
+  curproc->filesz = filesz;
+  curproc->off = offset;
 
   switchuvm(curproc);
   freevm(oldpgdir);
