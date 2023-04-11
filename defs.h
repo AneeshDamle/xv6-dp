@@ -15,6 +15,8 @@ void            binit(void);
 struct buf*     bread(uint, uint);
 void            brelse(struct buf*);
 void            bwrite(struct buf*);
+void            bread_bs(int, char *);
+void            bwrite_bs(char *, int);
 
 // console.c
 void            consoleinit(void);

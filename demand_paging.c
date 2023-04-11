@@ -104,18 +104,19 @@ int get_freepage_bs(void) {
  */
 uint write_bs(void) {
     uint victim_pa = get_victim();
-    int pid;
+    int pid, i;
     uint va;
     get_pa_procinfo(victim_pa, &pid, &va);
     set_page_invalid(pid, va);
-    int x = get_freepage_bs();
-    if (x == -1)
+    int freepgno = get_freepage_bs();
+    if (freepgno == -1)
         panic("backing-store full\n");
 
     /* TODO: Assembly code will come here */
+    bwrite_bs(victim_pa, freepgno);
 
     acquire(&bs.lock);
-    struct bsentry *idx = &(bs.table[x]);
+    struct bsentry *idx = &(bs.table[freepgno]);
     /* TODO: PID, VA kuthun milvayche? */
     idx->pid = pid;
     idx->va = va;
@@ -152,8 +153,9 @@ int is_pgonbs(int pid, uint va) {
  * param[in]: to_pa : physical address at which the page is to be written
  * TODO: Assembly to read page from bs
  */
-void read_bs(int from_bsidx, int to_pa) {
+void read_bs(int from_bsidx, uint to_pa) {
     /* TODO: Assembly code here */
+    bread_bs(from_bsidx,(char*)to_pa);
 
     acquire(&bs.lock);
 
@@ -183,7 +185,7 @@ int handle_page_fault(uint reqd_pgaddr) {
     /* create a page in memory */
     char *mem = kalloc();
     if (mem == 0) {
-        panic("backing store need\n");
+        // not needed now hopefully this will be panic("backing store need\n");
         /* write a victim page to backing store */
         // TODO: Think on how to link char *mem and retval of write_bs
         mem = write_bs();

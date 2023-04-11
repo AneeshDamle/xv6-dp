@@ -25,6 +25,8 @@
 #include "sleeplock.h"
 #include "fs.h"
 #include "buf.h"
+#include "mmu.h"
+
 
 struct {
   struct spinlock lock;
@@ -139,6 +141,37 @@ brelse(struct buf *b)
   
   release(&bcache.lock);
 }
+
+#define DEV_BS 2
+#define BLOCKS_IN_PAGE (PGSIZE / BSIZE)
+
+void
+bread_bs(int from_bs_pgno, char *to_phyaddr)
+{
+    int i;
+    struct buf *b;
+    for (i = 0; i < BLOCKS_IN_PAGE; i++) {
+        b = bread(DEV_BS, from_bs_pgno);
+        memmove(to_phyaddr + (i * BSIZE), b->data, BSIZE);
+        brelse(b);
+    }
+    return ;
+}
+
+void 
+bwrite_bs(char *from_pa, int to_blkno)
+{
+    struct buf *b;
+    int i = 0;
+    for (i = 0; i < BLOCKS_IN_PAGE; i++) {
+        b = bread(DEV_BS, to_blkno);
+        memmove(b->data, from_pa + (i * BSIZE), BSIZE);
+        bwrite(b);
+        brelse(b);
+    }
+    return;
+}
+
 //PAGEBREAK!
 // Blank page.
 
