@@ -317,6 +317,18 @@ clearpteu(pde_t *pgdir, char *uva)
   *pte &= ~PTE_U;
 }
 
+// Clear PTE_P on a page
+void
+clearptep(pde_t *pgdir, char *uva)
+{
+  pte_t *pte;
+
+  pte = walkpgdir(pgdir, uva, 0);
+  if(pte == 0)
+    panic("clearptep");
+  *pte &= ~PTE_P;
+}
+
 // Given a parent process's page table, create a copy
 // of it for a child.
 pde_t*

@@ -6,6 +6,7 @@
 #include "defs.h"
 #include "x86.h"
 #include "elf.h"
+#include "spinlock.h"
 
 #include "demand_paging.h"
 
@@ -58,6 +59,7 @@ struct bsentry {
  * TODO: Do we need a lock : spin/sleep?
  */
 struct {
+    struct spinlock lock;
     struct bsentry table[BS_NPAGES];
 } bs;
 
@@ -68,23 +70,28 @@ void bsinit(void) {
         bs.table[i].pid = -1;
         bs.table[i].va = 0;
     }
+    initlock(&bs.lock, "bstable");
     return;
 }
 
 /* Returns a page number for a free page in backing-store */
 int get_freepage_bs(void) {
     int i;
+
+    acquire(&bs.lock);
     /* return first free page */
-    for (i = 0; i < BS_NPAGES; i++)
-        if (bs.table[i].pid == -1 && bs.table[i].va == 0)
+    for (i = 0; i < BS_NPAGES; i++) {
+        if (bs.table[i].pid == -1 && bs.table[i].va == 0) {
+            release(&bs.lock);
             return i;
-    if (i == BS_NPAGES)
-        return -1;
+        }
+    }
+    release(&bs.lock);
     return -1;
 }
 
 /* Writes to backing store, updates free list, bs global array
- * /NOTE: write_bs will
+ * \NOTE: write_bs will
  * 1. search for a victim page
  * 2. write page to bs
  * 3. update backing-store global table
@@ -100,18 +107,34 @@ uint write_bs(void) {
     int pid;
     uint va;
     get_pa_procinfo(victim_pa, &pid, &va);
+
+    // Clear PTE_P on that page table
+    acquire(&ptable.lock);
+
+    struct proc *p;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+        if (p->pid == pid)
+            break;
+    if (p == &ptable.proc[NPROC])
+        panic("no process with pid from get_pa_procinfo");
+    clearptep(&p->pgdir, va);
+
+    release(&ptable.lock);
+
     int x = get_freepage_bs();
-    if (x == -1) {
+    if (x == -1)
         panic("backing-store full\n");
-    }
 
     /* TODO: Assembly code will come here */
 
+    acquire(&bs.lock);
     struct bsentry *idx = &(bs.table[x]);
     /* TODO: PID, VA kuthun milvayche? */
     idx->pid = pid;
     idx->va = va;
-    return victim_pa;
+    release(&bs.lock);
+
+    return P2V(victim_pa);
 }
 
 /* Determines if page is on backing-store
@@ -120,13 +143,20 @@ uint write_bs(void) {
  */
 int is_pgonbs(int pid, uint va) {
     int i;
+
+    acquire(&bs.lock);
+
     for (i = 0; i < BS_NPAGES; i++) {
         if (bs.table[i].pid == pid && bs.table[i].va == va) {
             cprintf("Found page on backing-store\n");
+            release(&bs.lock);
             return i;
         }
     }
     cprintf("Page not found on backing-store\n");
+
+    release(&bs.lock);
+
     return -1;
 }
 
@@ -137,8 +167,14 @@ int is_pgonbs(int pid, uint va) {
  */
 void read_bs(int from_bsidx, int to_pa) {
     /* TODO: Assembly code here */
+
+    acquire(&bs.lock);
+
     bs.table[from_bsidx].pid = -1;
     bs.table[from_bsidx].va = 0;
+
+    release(&bs.lock);
+
     return;
 }
 
@@ -163,7 +199,7 @@ int handle_page_fault(uint reqd_pgaddr) {
         panic("backing store need\n");
         /* write a victim page to backing store */
         // TODO: Think on how to link char *mem and retval of write_bs
-        write_bs();
+        mem = write_bs();
         cprintf("Page written to BS\n");
     }
     memset(mem, 0, PGSIZE);

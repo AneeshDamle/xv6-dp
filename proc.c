@@ -552,7 +552,7 @@ void get_pa_procinfo(uint pa, int *pid, uint *vaddr) {
         if (p->state == UNUSED)
             continue;
         for (va = 0; va < KERNBASE; va += PGSIZE) {
-            if ((pte = walkpgdir(p->pgdir, va, 0) != 0)) {
+            if ((pte = walkpgdir(p->pgdir, va, 0)) != 0) {
                 if (PTE_ADDR(*pte) == pa) {
                     *pid = p->pid;
                     *vaddr = va;
