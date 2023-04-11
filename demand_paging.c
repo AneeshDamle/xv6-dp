@@ -107,20 +107,7 @@ uint write_bs(void) {
     int pid;
     uint va;
     get_pa_procinfo(victim_pa, &pid, &va);
-
-    // Clear PTE_P on that page table
-    acquire(&ptable.lock);
-
-    struct proc *p;
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-        if (p->pid == pid)
-            break;
-    if (p == &ptable.proc[NPROC])
-        panic("no process with pid from get_pa_procinfo");
-    clearptep(&p->pgdir, va);
-
-    release(&ptable.lock);
-
+    set_page_invalid(pid, va);
     int x = get_freepage_bs();
     if (x == -1)
         panic("backing-store full\n");

@@ -569,3 +569,21 @@ void get_pa_procinfo(uint pa, int *pid, uint *vaddr) {
     return;
 }
 
+/* Make given process page invalid
+ * \NOTE: Set PTE_P bit of given (PID, VA) zero
+ */
+void set_page_invalid(int pid, uint va) {
+    // Clear PTE_P on that page table
+    acquire(&ptable.lock);
+
+    struct proc *p;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+        if (p->pid == pid)
+            break;
+    if (p == &ptable.proc[NPROC])
+        panic("no process with pid from get_pa_procinfo");
+    clearptep(&p->pgdir, va);
+    release(&ptable.lock);
+    return;
+}
+
