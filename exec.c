@@ -123,6 +123,7 @@ exec(char *path, char **argv)
 
   curproc->elfstart = ph.vaddr;
   curproc->elfsize = ph.filesz;
+  curproc->elfmemsize = ph.memsz;
   curproc->elfoff = ph.off;
   curproc->nuserpages = 0;
 

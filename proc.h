@@ -54,6 +54,7 @@ struct proc {
 
   uint elfstart;               // Start of ELF file's text section
   uint elfsize;                // Size of ELF's text section
+  uint elfmemsize;             // Size of ELF's text + data section
   uint elfoff;                 // Offset from where the ELF program be loaded
   uint idev;                   // Inode device num
   uint inum;                   // Inode number
