@@ -22,17 +22,6 @@ fmtname(char *path)
   return buf;
 }
 
-/*
-int fun(int a) {
-    if (a == 5000) {
-        return a;
-    } else {
-        printf(2, "a: %d\n", a);
-        return fun(a + 1);
-    }
-}
-*/
-
 void
 ls(char *path)
 {
@@ -40,7 +29,6 @@ ls(char *path)
   int fd;
   struct dirent de;
   struct stat st;
-  //fun(0);
 
   if((fd = open(path, 0)) < 0){
     printf(2, "ls: cannot open %s\n", path);

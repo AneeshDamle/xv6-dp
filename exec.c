@@ -19,11 +19,6 @@ exec(char *path, char **argv)
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
 
-  uint vaddr;
-  uint filesz;
-  uint offset;
-  struct inode *elfip;
-
   begin_op();
 
   if((ip = namei(path)) == 0){
@@ -31,7 +26,8 @@ exec(char *path, char **argv)
     cprintf("exec: fail\n");
     return -1;
   }
-  curproc->elfip = ip;
+  curproc->idev = get_idev(ip);
+  curproc->inum = get_inum(ip);
   ilock(ip);
   pgdir = 0;
 
@@ -46,8 +42,6 @@ exec(char *path, char **argv)
 
   // Load program into memory.
   sz = 0;
-  vaddr = 1;
-  filesz = 0;
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
       goto bad;
@@ -61,11 +55,6 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
-    sz = (sz > (ph.vaddr + ph.memsz)) ? sz : (ph.vaddr + ph.memsz);
-    vaddr = (vaddr <= ph.vaddr) ? vaddr : ph.vaddr;
-    filesz = (filesz >= ph.filesz) ? filesz : ph.filesz;
-    if (filesz == ph.filesz)
-        offset = ph.off;
     /* We should not load pages
     if(loaduvm(pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
       goto bad;*/
@@ -80,17 +69,24 @@ exec(char *path, char **argv)
   sz = PGROUNDUP(sz);
   if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
     goto bad;
-  /* allocate 2 pages for stack and guard */
-  // TODO: Error checking
-  int j;
-  for (j = 0; j < 2; j++) {
-    char *mem = kalloc();
-    memset(mem, 0, PGSIZE);
-    pte_t *pte = walkpgdir(pgdir, sz, 1);
-    *pte = V2P(mem) | PTE_W | PTE_U | PTE_P;
-    sz += PGSIZE;
+
+  /* allocate guard page */
+  char *mem = kalloc();
+  pte_t *pte = 0;
+  memset(mem, 0, PGSIZE);
+  if ((pte = walkpgdir(pgdir, (char*)(sz - 2 * PGSIZE), 0)) == 0) {
+      goto bad;
   }
-  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
+  *pte = V2P(mem) | PTE_W | PTE_P;
+
+  /* allocate stack page */
+  mem = kalloc();
+  memset(mem, 0, PGSIZE);
+  if ((pte = walkpgdir(pgdir, (char*)(sz - PGSIZE), 0)) == 0) {
+      goto bad;
+  }
+  *pte = V2P(mem) | PTE_W | PTE_P | PTE_U;
+
   sp = sz;
 
   // Push argument strings, prepare rest of stack in ustack.
@@ -125,9 +121,17 @@ exec(char *path, char **argv)
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
 
-  curproc->vaddr = vaddr;
-  curproc->filesz = filesz;
-  curproc->off = offset;
+  curproc->elfstart = ph.vaddr;
+  curproc->elfsize = ph.filesz;
+  curproc->elfoff = ph.off;
+  curproc->nuserpages = 0;
+
+  // initialise pages loaded in RAM
+  for (i = 0; i < MAXUSERPAGES; i++) {
+    curproc->rampgs[i] = -1;
+    curproc->bspgs[i][0] = 0;
+    curproc->bspgs[i][1] = -1;
+  }
 
   switchuvm(curproc);
   freevm(oldpgdir);

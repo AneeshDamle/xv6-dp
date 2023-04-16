@@ -225,7 +225,7 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
 int
 allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 {
-  char *mem;
+  //char *mem;
   uint a;
 
   if(newsz >= KERNBASE)
@@ -248,7 +248,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
     if(mappages(pgdir, (char*)a, PGSIZE, 0, PTE_W|PTE_U) < 0){
       cprintf("allocuvm out of memory (2)\n");
       deallocuvm(pgdir, newsz, oldsz);
-      kfree(mem);
+      //kfree(mem);
       return 0;
     }
   }

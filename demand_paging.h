@@ -1,5 +1,13 @@
 int handle_page_fault(uint);
 void bsinit(void);
-int write_backingstore(char *va);
-void read_backingstore(int from_bs, int to_pa);
-int is_pgonbs(int pid, uint va);
+
+#define MAXUSERPAGES (10)
+
+#define KB (1024)
+#define MB (KB * KB)
+#define GB (KB * KB * KB)
+
+#define BSSIZE (1 * MB)
+#define BSNPAGES (BSSIZE / PGSIZE)
+
+

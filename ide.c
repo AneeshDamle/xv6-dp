@@ -104,7 +104,7 @@ idestart(struct buf *b)
     outb(0x3f6, 0);
   else
     outb(0x376, 0);
-  
+
   outb(portno + 2, sector_per_block);
   outb(portno + 3, sector & 0xff);
   outb(portno + 4, (sector >> 8) & 0xff);

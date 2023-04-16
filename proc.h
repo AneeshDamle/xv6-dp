@@ -1,4 +1,3 @@
-#include "memlayout.h"
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -35,6 +34,8 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+#define MAXUSERPAGES (10)
+
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
@@ -51,11 +52,14 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
-  uint vaddr;
-  uint filesz;
-  uint off;
-  char path[16];               // Process path name
-  struct inode *elfip;
+  uint elfstart;               // Start of ELF file's text section
+  uint elfsize;                // Size of ELF's text section
+  uint elfoff;                 // Offset from where the ELF program be loaded
+  uint idev;                   // Inode device num
+  uint inum;                   // Inode number
+  int nuserpages;              // number of pages loaded
+  uint rampgs[MAXUSERPAGES];
+  uint bspgs[MAXUSERPAGES][2];    // TODO: Decide size
 };
 
 // Process memory is laid out contiguously, low addresses first:
