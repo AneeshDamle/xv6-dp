@@ -31,6 +31,15 @@ exec(char *path, char **argv)
   ilock(ip);
   pgdir = 0;
 
+  for (i = 0; i < MAXUSERPAGES; i++) {
+    if (curproc->rampgs[i] != -1) {
+      kfree((char*)UV2P(curproc->rampgs[i]));
+    }
+    curproc->rampgs[i] = -1;
+    curproc->bspgs[i][0] = 0;
+    curproc->bspgs[i][1] = -1;
+  }
+
   // Check ELF header
   if(readi(ip, (char*)&elf, 0, sizeof(elf)) != sizeof(elf))
     goto bad;
@@ -45,6 +54,7 @@ exec(char *path, char **argv)
   }
   curproc->procelf.phnum = elf.phnum;
   // Load program into memory.
+  cprintf("Process: %s\n", path);
   sz = 0;
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
@@ -130,12 +140,6 @@ exec(char *path, char **argv)
   curproc->tf->esp = sp;
 
   curproc->nuserpages = 0;
-  // initialise pages loaded in RAM
-  for (i = 0; i < MAXUSERPAGES; i++) {
-    curproc->rampgs[i] = -1;
-    curproc->bspgs[i][0] = 0;
-    curproc->bspgs[i][1] = -1;
-  }
 
   switchuvm(curproc);
   freevm(oldpgdir);

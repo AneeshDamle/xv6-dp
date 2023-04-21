@@ -7,5 +7,3 @@ void bsinit(void);
 
 #define BSSIZE (1 * MB)
 #define BSNPAGES (BSSIZE / PGSIZE)
-
-

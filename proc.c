@@ -89,6 +89,13 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
 
+  int i;
+  for (i = 0; i < MAXUSERPAGES; i++) {
+    p->rampgs[i] = -1;
+    p->bspgs[i][0] = 0;
+    p->bspgs[i][1] = -1;
+  }
+
   release(&ptable.lock);
 
   // Allocate kernel stack.

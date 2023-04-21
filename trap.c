@@ -82,7 +82,7 @@ trap(struct trapframe *tf)
     lapiceoi();
     break;
   case T_PGFLT:
-    cprintf("Page fault process: %s -> VA: %x\n", myproc()->name, rcr2());
+    cprintf("Page fault process: %s, %d -> VA: %x\n", myproc()->name, myproc()->pid, rcr2());
     if (handle_page_fault(rcr2()) != 0)
       panic("page fault handler\n");
     break;

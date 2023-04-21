@@ -97,8 +97,6 @@ is_pgonbs(uint va)
 
 // ================= PAGE FAULT HANDLER ================
 
-#define UV2P(va) (PTE_ADDR(*walkpgdir(myproc()->pgdir, (char*)va, 0)))
-
 // TODO: Search on how to differentiate between text and data
 enum program_section {INVALID, TEXT, DATA, GUARD, STACK, HEAP};
 
@@ -131,6 +129,7 @@ read_page_bs(uint va)
       break;
     }
   // read from backing-store
+  cprintf("Reading from backing-store\n");
   bread_bs(bsidx, (char*)UV2P(va));
   return;
 }
@@ -227,11 +226,9 @@ assign_page(uint va)
   if (curproc->nuserpages < MAXUSERPAGES) {
     mem = kalloc(); // Allocate new page from RAM
     pa = V2P(mem);
-  } else {
-    /*for (i = 0; i < MAXUSERPAGES; i++)
-      cprintf("rampgs[%d]: %d\n", i, curproc->rampgs[i]);*/
+  }
+  else {
     // write a page to backing-store
-
     // get victim page and update table of pages in RAM
     uint victim = get_victim();
     for (i = 0; i < MAXUSERPAGES; i++) {
@@ -240,7 +237,6 @@ assign_page(uint va)
         break;
       }
     }
-
     // update table of pages in backing store
     for (i = 0; i < BSNPAGES; i++) {
       if (curproc->bspgs[i][0] == 0 && curproc->bspgs[i][1] == -1) {
@@ -261,6 +257,7 @@ assign_page(uint va)
 
     // write victim to backing-store
     pa = UV2P(victim);
+    cprintf("Writing to backing store\n");
     bwrite_bs((char*)pa, freepageidx);
   }
 
@@ -284,6 +281,18 @@ assign_page(uint va)
   return 0;
 }
 
+void
+print_rampgs(void)
+{
+  int i;
+  struct proc *curproc = myproc();
+  cprintf("processname: %s, pid: %d\n", curproc->name, curproc->pid);
+  for (i = 0; i < MAXUSERPAGES; i++) {
+    cprintf("va: %x\n", curproc->rampgs[i]);
+  }
+  return;
+}
+
 // page fault handler
 int
 handle_page_fault(uint fault_va)
@@ -292,6 +301,8 @@ handle_page_fault(uint fault_va)
 
   // assign a page
   assign_page(fault_va);
+
+  print_rampgs();
 
   if (is_pgonbs(fault_va) == 1) {
     read_page_bs(fault_va);
