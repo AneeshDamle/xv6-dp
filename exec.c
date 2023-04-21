@@ -26,8 +26,8 @@ exec(char *path, char **argv)
     cprintf("exec: fail\n");
     return -1;
   }
-  curproc->idev = get_idev(ip);
-  curproc->inum = get_inum(ip);
+  curproc->procinode.idev = get_idev(ip);
+  curproc->procinode.inum = get_inum(ip);
   ilock(ip);
   pgdir = 0;
 
@@ -40,6 +40,10 @@ exec(char *path, char **argv)
   if((pgdir = setupkvm()) == 0)
     goto bad;
 
+  if(elf.phnum > MAXPHNUM) {
+    panic("more program headers than expected\n");
+  }
+  curproc->procelf.phnum = elf.phnum;
   // Load program into memory.
   sz = 0;
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
@@ -58,6 +62,10 @@ exec(char *path, char **argv)
     /* We should not load pages
     if(loaduvm(pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
       goto bad;*/
+    curproc->procelf.pelf[i].elfstart = ph.vaddr;
+    curproc->procelf.pelf[i].elfsize = ph.filesz;
+    curproc->procelf.pelf[i].elfmemsize = ph.memsz;
+    curproc->procelf.pelf[i].elfoff = ph.off;
   }
 
   iunlockput(ip);
@@ -70,7 +78,7 @@ exec(char *path, char **argv)
   if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
     goto bad;
 
-  /* allocate guard page */
+  // allocate guard page
   char *mem = kalloc();
   pte_t *pte = 0;
   memset(mem, 0, PGSIZE);
@@ -79,7 +87,7 @@ exec(char *path, char **argv)
   }
   *pte = V2P(mem) | PTE_W | PTE_P;
 
-  /* allocate stack page */
+  // allocate stack page
   mem = kalloc();
   memset(mem, 0, PGSIZE);
   if ((pte = walkpgdir(pgdir, (char*)(sz - PGSIZE), 0)) == 0) {
@@ -121,12 +129,7 @@ exec(char *path, char **argv)
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
 
-  curproc->elfstart = ph.vaddr;
-  curproc->elfsize = ph.filesz;
-  curproc->elfmemsize = ph.memsz;
-  curproc->elfoff = ph.off;
   curproc->nuserpages = 0;
-
   // initialise pages loaded in RAM
   for (i = 0; i < MAXUSERPAGES; i++) {
     curproc->rampgs[i] = -1;

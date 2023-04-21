@@ -135,25 +135,46 @@ read_page_bs(uint va)
   return;
 }
 
+int
+get_phidx(struct proc *proc, uint va)
+{
+  int i;
+  if (proc->procelf.phnum == 0) {
+      return 0;
+  }
+  for (i = 0; i < proc->procelf.phnum; i++) {
+    if (proc->procelf.pelf[i].elfstart <= va) {
+      return i;
+    }
+  }
+  panic("get_phidx: va error\n");
+}
+
 // returns virtual memory section of a virtual address
 int
 get_address_section(uint va)
 {
+  int phidx, elfstart, elfsize, elfmemsize;
   struct proc *curproc;
   enum program_section res = INVALID;
 
   curproc = myproc();
-  if (va < curproc->elfstart) {
+  phidx = get_phidx(curproc, va);
+  elfstart = curproc->procelf.pelf[phidx].elfstart;
+  elfsize = curproc->procelf.pelf[phidx].elfsize;
+  elfmemsize = curproc->procelf.pelf[phidx].elfmemsize;
+
+  if (va < elfstart) {
     res = INVALID;
   }
-  else if (curproc->elfstart <= va && va < KERNBASE) {
-    if (va < curproc->elfsize)
+  else if (elfstart <= va && va < KERNBASE) {
+    if (va < elfsize)
       res = TEXT;
-    else if (va < PGROUNDUP(curproc->elfsize) + PGSIZE)
+    else if (va < PGROUNDUP(elfsize) + PGSIZE)
       res = GUARD;
-    else if (va < PGROUNDUP(curproc->elfsize) + 2 * PGSIZE)
+    else if (va < PGROUNDUP(elfsize) + 2 * PGSIZE)
       res = STACK;
-    else if (va < curproc->elfmemsize)
+    else if (va < elfmemsize)
         res = DATA;
     else
       res = HEAP;
@@ -168,20 +189,25 @@ get_address_section(uint va)
 int
 load_page(uint va)
 {
-  struct proc *curproc;
+  int phidx, elfsize, elfoff;
   uint pa, loadsize;
+  struct proc *curproc;
   struct inode *elfip;
 
   curproc = myproc();
+  phidx = get_phidx(curproc, va);
+  elfsize = curproc->procelf.pelf[phidx].elfsize;
+  elfoff = curproc->procelf.pelf[phidx].elfoff;
+
   begin_op();
   loadsize = PGSIZE;
-  if (va + PGSIZE > curproc->elfsize)
-    loadsize = curproc->elfsize - va;
+  if (va + PGSIZE > elfsize)
+    loadsize = elfsize - va;
   // Get inode
-  elfip = iget(curproc->idev, curproc->inum);
+  elfip = iget(curproc->procinode.idev, curproc->procinode.inum);
   // load the page
   pa = UV2P(va);
-  readi(elfip, P2V(pa), curproc->elfoff + va, loadsize);
+  readi(elfip, P2V(pa), elfoff + va, loadsize);
   end_op();
 
   return 0;

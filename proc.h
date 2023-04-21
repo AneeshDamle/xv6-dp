@@ -34,7 +34,25 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
-#define MAXUSERPAGES (10)
+#define MAXUSERPAGES (10)      // Maximum pages a process can load in memory
+#define MAXPHNUM (2)           // Maximum program headers in an ELF: assume
+
+struct pelf {
+  uint elfstart;               // Start of ELF file's text section
+  uint elfsize;                // Size of ELF's text section
+  uint elfmemsize;             // Size of ELF's text + data section
+  uint elfoff;                 // Offset from where the ELF program be loaded
+};
+
+struct procelf {
+  struct pelf pelf[MAXPHNUM];
+  int phnum;                   // Number of program headers
+};
+
+struct procinode {
+  uint idev;                   // Inode device num
+  uint inum;                   // Inode number
+};
 
 // Per-process state
 struct proc {
@@ -52,12 +70,8 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
-  uint elfstart;               // Start of ELF file's text section
-  uint elfsize;                // Size of ELF's text section
-  uint elfmemsize;             // Size of ELF's text + data section
-  uint elfoff;                 // Offset from where the ELF program be loaded
-  uint idev;                   // Inode device num
-  uint inum;                   // Inode number
+  struct procelf procelf;
+  struct procinode procinode;
   int nuserpages;              // number of pages loaded
   uint rampgs[MAXUSERPAGES];
   uint bspgs[MAXUSERPAGES][2];    // TODO: Decide size
