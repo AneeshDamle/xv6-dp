@@ -195,3 +195,7 @@ uint*           walkpgdir(pde_t *pgdir, const void *va, int alloc);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+
+// demand_paging.c
+int handle_page_fault(uint);
+void bsinit(void);

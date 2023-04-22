@@ -11,4 +11,5 @@
 #define LOGSIZE      (MAXOPBLOCKS*3)  // max data blocks in on-disk log
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       1000  // size of file system in blocks
-
+#define BSSIZE       (1 * 1024 * 1024) // size of backing-store
+#define BSNPAGES     (BSSIZE / PGSIZE) // maximum pages on backing-store

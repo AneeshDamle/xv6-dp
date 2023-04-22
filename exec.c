@@ -33,7 +33,7 @@ exec(char *path, char **argv)
 
   for (i = 0; i < MAXUSERPAGES; i++) {
     if (curproc->rampgs[i] != -1) {
-      kfree((char*)P2V(UV2P(curproc->rampgs[i])));
+      kfree((char*)P2V(UV2P(curproc->pgdir, curproc->rampgs[i])));
       clearptep(curproc->pgdir, (char*)curproc->rampgs[i]);
       curproc->nuserpages--;
     }

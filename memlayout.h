@@ -14,4 +14,4 @@
 #define V2P_WO(x) ((x) - KERNBASE)    // same as V2P, but without casts
 #define P2V_WO(x) ((x) + KERNBASE)    // same as P2V, but without casts
 
-#define UV2P(va) (PTE_ADDR(*walkpgdir(myproc()->pgdir, (char*)va, 0)))
+#define UV2P(pgdir, va) (PTE_ADDR(*walkpgdir(pgdir, (char*)va, 0)))

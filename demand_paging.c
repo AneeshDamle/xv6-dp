@@ -8,8 +8,6 @@
 #include "elf.h"
 #include "spinlock.h"
 
-#include "demand_paging.h"
-
 
 // ================== PAGE REPLACEMENT ALGORITHMS ================
 /* random number generator function
@@ -114,7 +112,7 @@ read_page_bs(uint va, int bsidx)
 
   // read from backing-store
   cprintf("Reading from backing-store\n");
-  bread_bs(bsidx, (char*)UV2P(va));
+  bread_bs(bsidx, (char*)UV2P(curproc->pgdir, va));
 
   // update backing-store bitmap
   acquire(&bs.lock);
@@ -199,7 +197,7 @@ load_page(uint va)
   // Get inode
   elfip = iget(curproc->procinode.idev, curproc->procinode.inum);
   // load the page
-  pa = UV2P(va);
+  pa = UV2P(curproc->pgdir, va);
   readi(elfip, P2V(pa), elfoff + va, loadsize);
 
   end_op();
@@ -217,7 +215,7 @@ void write_bs(uint victim) {
   // get free page in backing-store
   freepageidx = get_locked_freepage_bs();
 
-  pa = UV2P(victim);
+  pa = UV2P(curproc->pgdir, victim);
   cprintf("Writing to backing store\n");
   bwrite_bs((char*)pa, freepageidx);
 
@@ -247,7 +245,7 @@ void free_ram_page() {
   vidx = get_victim_index();
   victim = curproc->rampgs[vidx];
   write_bs(victim);
-  kfree((char*)P2V(UV2P(victim)));
+  kfree((char*)P2V(UV2P(curproc->pgdir, victim)));
   clearptep(curproc->pgdir, (char*)victim);
   curproc->rampgs[vidx] = -1;
 
