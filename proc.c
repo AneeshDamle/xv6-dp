@@ -95,6 +95,7 @@ found:
     p->bspgs[i][0] = 0;
     p->bspgs[i][1] = -1;
   }
+  p->nuserpages = 0;
 
   release(&ptable.lock);
 
@@ -137,6 +138,10 @@ userinit(void)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   p->sz = PGSIZE;
+  // update elf size of initcode
+  p->procelf.phnum = 1;
+  p->procelf.pelf[0].elfstart = (uint)_binary_initcode_start;
+  p->procelf.pelf[0].elfsize = (uint)_binary_initcode_size;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -297,6 +302,13 @@ wait(void)
         kfree(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir);
+        int i;
+        for (i = 0; i < MAXUSERPAGES; i++) {
+          p->rampgs[i] = -1;
+          p->bspgs[i][0] = 0;
+          p->bspgs[i][1] = -1;
+        }
+        p->nuserpages = 0;
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;

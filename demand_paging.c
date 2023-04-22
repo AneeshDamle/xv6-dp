@@ -30,8 +30,8 @@ uint get_random_number(void) {
 }
 
 // get victim page (virtual address)
-uint get_victim() {
-  return myproc()->rampgs[get_random_number() % MAXUSERPAGES];
+uint get_victim_index() {
+  return get_random_number() % MAXUSERPAGES;
 }
 
 // =================== BACKING STORE =================
@@ -64,35 +64,38 @@ bsinit(void)
 
 // return a free page from backing-store
 int
-get_freepage_bs()
+get_locked_freepage_bs()
 {
   int i;
   acquire(&bs.lock);
 
-  for (i = 0; i < BSNPAGES; i++)
-    if (bs.bitmap[i] == 0)
+  for (i = 0; i < BSNPAGES; i++) {
+    if (bs.bitmap[i] == 0) {
+      bs.bitmap[i] = 1;
       break;
-  if (i == BSNPAGES)
-    panic("No space in backing-store\n");
+    }
+  }
+  if (i == BSNPAGES) {
+    panic("get_locked_freepage_bs: No space in backing-store\n");
+  }
 
   release(&bs.lock);
   return i;
 }
 
 int
-is_pgonbs(uint va)
+get_pgidx_bs(uint va)
 {
   struct proc *curproc;
   int i;
 
   curproc = myproc();
-  for (i = 0; i < MAXUSERPAGES; i++)
-    if (curproc->bspgs[i][0] == va && curproc->bspgs[i][1] != -1)
-      break;
-  if (i == MAXUSERPAGES)
-    return 0;
-  else
-    return 1;
+  for (i = 0; i < MAXUSERPAGES; i++) {
+    if (curproc->bspgs[i][0] == va && curproc->bspgs[i][1] != -1) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 // ================= PAGE FAULT HANDLER ================
@@ -102,51 +105,39 @@ enum program_section {INVALID, TEXT, DATA, GUARD, STACK, HEAP};
 
 // read page storing virtual address from backing-store
 void
-read_page_bs(uint va)
+read_page_bs(uint va, int bsidx)
 {
+  int i;
   struct proc *curproc;
-  int i, bsidx = -1;
 
   curproc = myproc();
-  // update table of pages in bs
-  for (i = 0; i < BSNPAGES; i++) {
-    if (curproc->bspgs[i][0] == va && curproc->bspgs[i][1] != -1) {
-      bsidx = curproc->bspgs[i][1];
-      curproc->bspgs[i][0] = 0;
-      curproc->bspgs[i][1] = -1;
-      break;
-    }
-  }
+
+  // read from backing-store
+  cprintf("Reading from backing-store\n");
+  bread_bs(bsidx, (char*)UV2P(va));
+
   // update backing-store bitmap
   acquire(&bs.lock);
   bs.bitmap[i] = 0;
   release(&bs.lock);
 
-  // update table of pages in RAM
-  for (i = 0; i < MAXUSERPAGES; i++)
-    if (curproc->rampgs[i] == -1) {
-      curproc->rampgs[i] = va;
-      break;
-    }
-  // read from backing-store
-  cprintf("Reading from backing-store\n");
-  bread_bs(bsidx, (char*)UV2P(va));
+  // update table of pages in bs
+  curproc->bspgs[bsidx][0] = 0;
+  curproc->bspgs[bsidx][1] = -1;
   return;
 }
 
 int
 get_phidx(struct proc *proc, uint va)
 {
-  int i;
-  if (proc->procelf.phnum == 0) {
-      return 0;
-  }
+  int i, idx = 0;
+
   for (i = 0; i < proc->procelf.phnum; i++) {
     if (proc->procelf.pelf[i].elfstart <= va) {
-      return i;
+      idx = i;
     }
   }
-  panic("get_phidx: va error\n");
+  return idx;
 }
 
 // returns virtual memory section of a virtual address
@@ -159,6 +150,7 @@ get_address_section(uint va)
 
   curproc = myproc();
   phidx = get_phidx(curproc, va);
+
   elfstart = curproc->procelf.pelf[phidx].elfstart;
   elfsize = curproc->procelf.pelf[phidx].elfsize;
   elfmemsize = curproc->procelf.pelf[phidx].elfmemsize;
@@ -169,12 +161,12 @@ get_address_section(uint va)
   else if (elfstart <= va && va < KERNBASE) {
     if (va < elfsize)
       res = TEXT;
-    else if (va < PGROUNDUP(elfsize) + PGSIZE)
-      res = GUARD;
-    else if (va < PGROUNDUP(elfsize) + 2 * PGSIZE)
-      res = STACK;
     else if (va < elfmemsize)
-        res = DATA;
+      res = DATA;
+    else if (va < PGROUNDUP(elfmemsize) + PGSIZE)
+      res = GUARD;
+    else if (va < PGROUNDUP(elfmemsize) + 2 * PGSIZE)
+      res = STACK;
     else
       res = HEAP;
   }
@@ -195,10 +187,12 @@ load_page(uint va)
 
   curproc = myproc();
   phidx = get_phidx(curproc, va);
+
   elfsize = curproc->procelf.pelf[phidx].elfsize;
   elfoff = curproc->procelf.pelf[phidx].elfoff;
 
   begin_op();
+
   loadsize = PGSIZE;
   if (va + PGSIZE > elfsize)
     loadsize = elfsize - va;
@@ -207,9 +201,58 @@ load_page(uint va)
   // load the page
   pa = UV2P(va);
   readi(elfip, P2V(pa), elfoff + va, loadsize);
+
   end_op();
 
   return 0;
+}
+
+// write victim page to backing store
+void write_bs(uint victim) {
+  int i, freepageidx;
+  uint pa;
+  struct proc *curproc;
+
+  curproc = myproc();
+  // get free page in backing-store
+  freepageidx = get_locked_freepage_bs();
+
+  pa = UV2P(victim);
+  cprintf("Writing to backing store\n");
+  bwrite_bs((char*)pa, freepageidx);
+
+  // update table of pages in backing store
+  for (i = 0; i < MAXUSERPAGES; i++) {
+    if (curproc->bspgs[i][0] == 0 && curproc->bspgs[i][1] == -1) {
+      curproc->bspgs[i][0] = victim;
+      curproc->bspgs[i][1] = freepageidx;
+      break;
+    }
+  }
+  if (i == MAXUSERPAGES) {
+    panic("assign_page: process's backing store table is full\n");
+  }
+
+  return;
+}
+
+// get victim page and update table of pages in RAM
+void free_ram_page() {
+  int vidx;
+  uint victim;
+  struct proc *curproc;
+
+  curproc = myproc();
+
+  vidx = get_victim_index();
+  victim = curproc->rampgs[vidx];
+  write_bs(victim);
+  kfree((char*)P2V(UV2P(victim)));
+  clearptep(curproc->pgdir, (char*)victim);
+  curproc->rampgs[vidx] = -1;
+
+  curproc->nuserpages--;
+  return;
 }
 
 // create a page in memory
@@ -219,64 +262,35 @@ assign_page(uint va)
   char *mem = 0;
   pte_t *pte;
   struct proc *curproc;
-  uint pa;
   int i;
 
   curproc = myproc();
-  if (curproc->nuserpages < MAXUSERPAGES) {
-    mem = kalloc(); // Allocate new page from RAM
-    pa = V2P(mem);
+  if (curproc->nuserpages >= MAXUSERPAGES) {
+    // free a page in process's memory table
+    free_ram_page();
   }
-  else {
-    // write a page to backing-store
-    // get victim page and update table of pages in RAM
-    uint victim = get_victim();
-    for (i = 0; i < MAXUSERPAGES; i++) {
-      if (curproc->rampgs[i] == victim) {
-        curproc->rampgs[i] = -1;
-        break;
-      }
-    }
-    // update table of pages in backing store
-    for (i = 0; i < BSNPAGES; i++) {
-      if (curproc->bspgs[i][0] == 0 && curproc->bspgs[i][1] == -1) {
-        break;
-      }
-    }
-    if (i == BSNPAGES) {
-      panic("assign_page: process's backing store table is full\n");
-    }
-    int freepageidx = get_freepage_bs();
-
-    acquire(&bs.lock);
-    bs.bitmap[freepageidx] = 1;
-    release(&bs.lock);
-
-    curproc->bspgs[i][0] = victim;
-    curproc->bspgs[i][1] = freepageidx;
-
-    // write victim to backing-store
-    pa = UV2P(victim);
-    cprintf("Writing to backing store\n");
-    bwrite_bs((char*)pa, freepageidx);
-  }
+  mem = kalloc();
 
   memset(mem, 0, PGSIZE);
   // update PTE to remember new page
   if((pte = walkpgdir(curproc->pgdir, (char*)va, 0)) == 0)
     if((pte = walkpgdir(curproc->pgdir, (char*)va, 1)) == 0)
       panic("page-fault address should exist\n");
-  *pte = pa | PTE_W | PTE_U | PTE_P;
+  *pte = V2P(mem) | PTE_W | PTE_U | PTE_P;
 
   if (curproc->nuserpages < MAXUSERPAGES)
     curproc->nuserpages++;
 
   // update table of pages loaded in RAM
   for (i = 0; i < MAXUSERPAGES; i++) {
-    if (curproc->rampgs[i] == -1)
+    if (curproc->rampgs[i] == -1) {
+      curproc->rampgs[i] = va;
       break;
+    }
   }
-  curproc->rampgs[i] = va;
+  if (i == MAXUSERPAGES) {
+      panic("MAXUSERPAGES full\n");
+  }
 
   return 0;
 }
@@ -297,15 +311,17 @@ print_rampgs(void)
 int
 handle_page_fault(uint fault_va)
 {
+  int bsidx;
   fault_va = PGROUNDDOWN(fault_va);
 
   // assign a page
   assign_page(fault_va);
 
-  print_rampgs();
+  //print_rampgs();
+  //cprintf("NUSERPAGES: %d\n", myproc()->nuserpages);
 
-  if (is_pgonbs(fault_va) == 1) {
-    read_page_bs(fault_va);
+  if ((bsidx = get_pgidx_bs(fault_va)) >= 0) {
+    read_page_bs(fault_va, bsidx);
     return 0;
   }
 
@@ -316,7 +332,7 @@ handle_page_fault(uint fault_va)
       break;
     case STACK:
     case HEAP:
-      cprintf("Stack section loaded\n");
+      //cprintf("Stack section loaded\n");
       break;
     case DATA:
     case TEXT:
