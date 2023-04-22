@@ -1779,7 +1779,7 @@ main(int argc, char *argv[])
   exitiputtest();
   iputtest();
 
-  //mem();
+  mem();
   pipe1();
   preempt();
   exitwait();
@@ -1797,7 +1797,7 @@ main(int argc, char *argv[])
 
   uio();
 
-  //exectest();
+  exectest();
   printf(1, "ALL TESTS PASSED\n");
 
   exit();
