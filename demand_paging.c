@@ -39,10 +39,12 @@ uint get_victim_index() {
 // 3. Backing store table --> bitmap
 
 // TODO: backing-store "bit"map
+
 struct bs {
   int bitmap[BSNPAGES];
   struct spinlock lock;
 } bs;
+
 
 // initialize backing-store bitmap
 void
@@ -316,14 +318,20 @@ print_rampgs(void)
 int
 handle_page_fault(uint fault_va)
 {
+
   int bsidx;
   fault_va = PGROUNDDOWN(fault_va);
+
+  cprintf("%x is greater then %x? %d\n", fault_va, KERNBASE, fault_va>KERNBASE);
+  if (fault_va > KERNBASE) {
+    panic("fault above KERNBASE");
+  }
 
   // assign a page
   assign_page(fault_va);
 
-  //print_rampgs();
-  //cprintf("NUSERPAGES: %d\n", myproc()->nuserpages);
+  print_rampgs();
+  cprintf("NUSERPAGES: %d\n", myproc()->nuserpages);
 
   if ((bsidx = get_pgidx_bs(fault_va)) >= 0) {
     read_page_bs(fault_va, bsidx);
@@ -334,6 +342,9 @@ handle_page_fault(uint fault_va)
     case INVALID:
       cprintf("Page fault in kernel space\n");
       myproc()->killed = 1;
+      for (int i = 0; i < BSNPAGES; i++)
+        cprintf(" %d ", bs.bitmap[i]);
+      cprintf("\n");
       break;
     case STACK:
     case HEAP:
@@ -349,3 +360,20 @@ handle_page_fault(uint fault_va)
   return 0;
 }
 
+int
+sys_bspages(void)
+{
+  struct proc *curproc;
+  int pid;
+
+  acquire(&bs.lock);
+  cprintf("********BSPAGES BITMAP********\n");
+  for (int i = 0; i < BSNPAGES; i++)
+    cprintf("%d", bs.bitmap[i]);
+  cprintf("\n");
+
+  
+  release(&bs.lock);
+  return 0;
+
+}
