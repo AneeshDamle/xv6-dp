@@ -108,15 +108,12 @@ void
 read_page_bs(uint va, int bsidx)
 {
   int i;
-  uint pa;
   struct proc *curproc;
 
   curproc = myproc();
 
   // read from backing-store
   cprintf("Reading from backing-store: %x, idx: %d\n", va, bsidx);
-  pa = UV2P(curproc->pgdir, va);
-  cprintf("Reading PA: %d\n", pa);
   bread_bs(bsidx, (char*)va);
 
   // update backing-store bitmap
@@ -213,16 +210,12 @@ load_page(uint va)
 // write victim page to backing store
 void write_bs(uint victim) {
   int i, freepageidx;
-  uint pa;
   struct proc *curproc;
 
   curproc = myproc();
   // get free page in backing-store
   freepageidx = get_locked_freepage_bs();
-  cprintf("Freepage idx: %d\n", freepageidx);
 
-  pa = UV2P(curproc->pgdir, victim);
-  cprintf("PA: %x\n", pa);
   cprintf("Writing to backing store\n");
   bwrite_bs((char*)victim, freepageidx);
 
@@ -276,7 +269,6 @@ assign_page(uint va)
     free_ram_page();
   }
   mem = kalloc();
-  cprintf("Mem kalloced: %x\n", mem);
 
   memset(mem, 0, PGSIZE);
   // update PTE to remember new page
@@ -318,20 +310,20 @@ print_rampgs(void)
 int
 handle_page_fault(uint fault_va)
 {
-
   int bsidx;
   fault_va = PGROUNDDOWN(fault_va);
 
-  cprintf("%x is greater then %x? %d\n", fault_va, KERNBASE, fault_va>KERNBASE);
   if (fault_va > KERNBASE) {
-    panic("fault above KERNBASE");
+    cprintf("Page fault in kernel space\n");
+    myproc()->killed = 1;
+    return 0;
   }
 
   // assign a page
   assign_page(fault_va);
 
-  print_rampgs();
-  cprintf("NUSERPAGES: %d\n", myproc()->nuserpages);
+  //print_rampgs();
+  //cprintf("NUSERPAGES: %d\n", myproc()->nuserpages);
 
   if ((bsidx = get_pgidx_bs(fault_va)) >= 0) {
     read_page_bs(fault_va, bsidx);
@@ -342,9 +334,6 @@ handle_page_fault(uint fault_va)
     case INVALID:
       cprintf("Page fault in kernel space\n");
       myproc()->killed = 1;
-      for (int i = 0; i < BSNPAGES; i++)
-        cprintf(" %d ", bs.bitmap[i]);
-      cprintf("\n");
       break;
     case STACK:
     case HEAP:
@@ -363,17 +352,24 @@ handle_page_fault(uint fault_va)
 int
 sys_bspages(void)
 {
-  struct proc *curproc;
-  int pid;
+  int i;
 
   acquire(&bs.lock);
-  cprintf("********BSPAGES BITMAP********\n");
-  for (int i = 0; i < BSNPAGES; i++)
+
+  cprintf("*** BSPAGES BITMAP *** : ");
+  for (i = 0; i < BSNPAGES; i++) {
     cprintf("%d", bs.bitmap[i]);
+  }
   cprintf("\n");
 
-  
   release(&bs.lock);
+
   return 0;
 
+}
+
+int sys_rampages(void)
+{
+  print_rampgs();
+  return 0;
 }

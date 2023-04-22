@@ -54,7 +54,7 @@ exec(char *path, char **argv)
   if(elf.phnum > MAXPHNUM) {
     panic("more program headers than expected\n");
   }
-  curproc->procelf.phnum = 1;
+  curproc->procelf.phnum = elf.phnum;
   // Load program into memory.
   cprintf("Process: %s\n", path);
   sz = 0;
@@ -78,6 +78,9 @@ exec(char *path, char **argv)
     curproc->procelf.pelf[i].elfsize = ph.filesz;
     curproc->procelf.pelf[i].elfmemsize = ph.memsz;
     curproc->procelf.pelf[i].elfoff = ph.off;
+  }
+  if (curproc->procelf.phnum > 1) {
+    curproc->procelf.phnum--;
   }
 
   iunlockput(ip);
