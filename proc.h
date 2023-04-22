@@ -34,7 +34,7 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
-#define MAXUSERPAGES (50)     // Maximum pages a process can load in memory
+#define MAXUSERPAGES (15)     // Maximum pages a process can load in memory
 #define MAXPHNUM (2)           // Maximum program headers in an ELF: assume
 
 struct pelf {

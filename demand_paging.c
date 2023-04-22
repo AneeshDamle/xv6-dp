@@ -106,13 +106,16 @@ void
 read_page_bs(uint va, int bsidx)
 {
   int i;
+  uint pa;
   struct proc *curproc;
 
   curproc = myproc();
 
   // read from backing-store
-  cprintf("Reading from backing-store\n");
-  bread_bs(bsidx, (char*)UV2P(curproc->pgdir, va));
+  cprintf("Reading from backing-store: %x, idx: %d\n", va, bsidx);
+  pa = UV2P(curproc->pgdir, va);
+  cprintf("Reading PA: %d\n", pa);
+  bread_bs(bsidx, (char*)va);
 
   // update backing-store bitmap
   acquire(&bs.lock);
@@ -214,10 +217,12 @@ void write_bs(uint victim) {
   curproc = myproc();
   // get free page in backing-store
   freepageidx = get_locked_freepage_bs();
+  cprintf("Freepage idx: %d\n", freepageidx);
 
   pa = UV2P(curproc->pgdir, victim);
+  cprintf("PA: %x\n", pa);
   cprintf("Writing to backing store\n");
-  bwrite_bs((char*)pa, freepageidx);
+  bwrite_bs((char*)victim, freepageidx);
 
   // update table of pages in backing store
   for (i = 0; i < MAXUSERPAGES; i++) {
@@ -244,6 +249,7 @@ void free_ram_page() {
 
   vidx = get_victim_index();
   victim = curproc->rampgs[vidx];
+  cprintf("Victim va: %x\n", victim);
   write_bs(victim);
   kfree((char*)P2V(UV2P(curproc->pgdir, victim)));
   clearptep(curproc->pgdir, (char*)victim);
@@ -268,6 +274,7 @@ assign_page(uint va)
     free_ram_page();
   }
   mem = kalloc();
+  cprintf("Mem kalloced: %x\n", mem);
 
   memset(mem, 0, PGSIZE);
   // update PTE to remember new page
@@ -330,7 +337,7 @@ handle_page_fault(uint fault_va)
       break;
     case STACK:
     case HEAP:
-      //cprintf("Stack section loaded\n");
+      cprintf("Stack section loaded\n");
       break;
     case DATA:
     case TEXT:

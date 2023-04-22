@@ -54,7 +54,7 @@ exec(char *path, char **argv)
   if(elf.phnum > MAXPHNUM) {
     panic("more program headers than expected\n");
   }
-  curproc->procelf.phnum = elf.phnum;
+  curproc->procelf.phnum = 1;
   // Load program into memory.
   cprintf("Process: %s\n", path);
   sz = 0;
@@ -98,6 +98,7 @@ exec(char *path, char **argv)
       goto bad;
   }
   *pte = V2P(mem) | PTE_W | PTE_P;
+  curproc->rampgs[0] = sz - 2 * PGSIZE;
 
   // allocate stack page
   mem = kalloc();
@@ -106,6 +107,7 @@ exec(char *path, char **argv)
       goto bad;
   }
   *pte = V2P(mem) | PTE_W | PTE_P | PTE_U;
+  curproc->rampgs[1] = sz - PGSIZE;
 
   sp = sz;
 
@@ -128,6 +130,7 @@ exec(char *path, char **argv)
   if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
     goto bad;
 
+
   // Save program name for debugging.
   for(last=s=path; *s; s++)
     if(*s == '/')
@@ -141,7 +144,7 @@ exec(char *path, char **argv)
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
 
-  curproc->nuserpages = 0;
+  curproc->nuserpages = 2;
 
   switchuvm(curproc);
   freevm(oldpgdir);

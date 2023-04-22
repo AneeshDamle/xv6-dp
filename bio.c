@@ -147,28 +147,28 @@ brelse(struct buf *b)
 void
 bread_bs(int from_bspg, char *to_pa)
 {
-    int i;
-    struct buf *b;
-    for (i = 0; i < BLOCKS_IN_PAGE; i++) {
-        b = bread(DEV_BS, from_bspg);
-        memmove(to_pa + (i * BSIZE), b->data, BSIZE);
-        brelse(b);
-    }
-    return ;
+  int i;
+  struct buf *b;
+  for (i = 0; i < BLOCKS_IN_PAGE; i++) {
+    b = bread(DEV_BS, from_bspg + i);
+    memmove(to_pa + (i * BSIZE), b->data, BSIZE);
+    brelse(b);
+  }
+  return ;
 }
 
 void
 bwrite_bs(char *from_pa, int to_bspg)
 {
-    struct buf *b;
-    int i = 0;
-    for (i = 0; i < BLOCKS_IN_PAGE; i++) {
-        b = bread(DEV_BS, to_bspg);
-        memmove(b->data, from_pa + (i * BSIZE), BSIZE);
-        bwrite(b);
-        brelse(b);
-    }
-    return;
+  struct buf *b;
+  int i = 0;
+  for (i = 0; i < BLOCKS_IN_PAGE; i++) {
+    b = bget(DEV_BS, to_bspg + i);
+    memmove(b->data, (char *)from_pa + (i * BSIZE), BSIZE);
+    bwrite(b);
+    brelse(b);
+  }
+  return;
 }
 
 //PAGEBREAK!
