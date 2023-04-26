@@ -86,32 +86,23 @@ Q. What to do when the RAM is full?
   kmem.freelist
 - Then, kalloc() should return the same page
 
+Our approach:
+-------------
+To make testing the working simple, we restrict each process to n pages in RAM
+We store the virtual addresses of pages in bs in 1 table, in RAM in another
+To remember which pages have been written to in the bs, we maintain a bitmap
+of actual bs pages
+
 Q1. How to select a victim page?
 - We are implementing demand paging only for user processes
-- So, we only have to deal with pages of those physical addresses
-  i.e. PHYSTOP to DEVSPACE
 - We'll implement a preliminary random allocator:), and get a physical page
   address randomly (using randint ;)
 - NOTE: Any user process page could be selected (Stack/Heap/Code/Data)
 
 Q2. How to write it to the backing store?
-- We should maintain a list of "free pages in BS" in Kernel Memory
+- Optimzation 102: We could maintain a list of "free pages in BS" in Kernel Memory
 - Take out the first free page, disk I/O will write a page to the BS
 - Update the free list, and also the process's mmuinfo
-
-Process's "mmuinfo":
-Table of every process's user page mapped
---------------------
-| 0 | BS  | page 3 |
---------------------
-| 1 | RAM |        |
---------------------
-| 2 | ELF |        |
---------------------
-| 3 | BS  | page 7 |
---------------------
-| ...              |
---------------------
 
 Q3. How to read on a page fault?
 - We first check whether the page fault is on a stack/heap (HOW TO ?), or
@@ -119,9 +110,13 @@ Q3. How to read on a page fault?
 - If it's on code/data, find a free frame, then check if page content is on backing
   store OR not, and load it respectively from BS(readbackingstore) or
   ELF(readi - already written)
-- If it's on stack/heap, find a free frame, blab-blah-blah, and ? (ASK SIR)
+- If it's on stack/heap, find a free frame, search in bs and write, if not,
+  just assign and return
+- NOTE: In xv6, conceptually, only 1 stack page is allocated to each process
 
-
-Further Optimizations: Modified bit for deciding to store/not in BS
-                       LRU DLL for optimised page replacement algo
+Further Optimizations:
+- Optimization 101: If page is of TEXT section, avoid write to backing-store
+  --> DONE
+- Optimization 102: Modified bit for deciding to store/not in BS
+- Optimization 103: LRU DLL for optimised page replacement algo
 
