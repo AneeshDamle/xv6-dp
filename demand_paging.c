@@ -245,7 +245,8 @@ void free_ram_page() {
   vidx = get_victim_index();
   victim = curproc->rampgs[vidx];
   cprintf("Victim va: %x\n", victim);
-  write_bs(victim);
+  if (get_address_section(victim) != TEXT)
+    write_bs(victim);
   kfree((char*)P2V(UV2P(curproc->pgdir, victim)));
   clearptep(curproc->pgdir, (char*)victim);
   curproc->rampgs[vidx] = -1;
