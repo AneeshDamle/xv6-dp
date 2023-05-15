@@ -118,7 +118,7 @@ read_page_bs(uint va, int bsidx)
 
   // update backing-store bitmap
   acquire(&bs.lock);
-  bs.bitmap[i] = 0;
+  bs.bitmap[bsidx] = 0;
   release(&bs.lock);
 
   // update table of pages in bs
@@ -198,9 +198,11 @@ load_page(uint va)
     loadsize = elfsize - va;
   // Get inode
   elfip = iget(curproc->procinode.idev, curproc->procinode.inum);
+  ilock(elfip);
   // load the page
   pa = UV2P(curproc->pgdir, va);
   readi(elfip, P2V(pa), elfoff + va, loadsize);
+  iunlock(elfip);
 
   end_op();
 
