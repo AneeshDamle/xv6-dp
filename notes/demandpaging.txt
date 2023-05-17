@@ -112,11 +112,16 @@ Q3. How to read on a page fault?
   ELF(readi - already written)
 - If it's on stack/heap, find a free frame, search in bs and write, if not,
   just assign and return
-- NOTE: In xv6, conceptually, only 1 stack page is allocated to each process
+- *NOTE*: In xv6, conceptually, only 1 stack page is allocated to each process
+
+Future TODOS:
+- 1. "bit" map :)
+- 2. clear bs bitmap locations of exiting process
 
 Further Optimizations:
 - Optimization 101: If page is of TEXT section, avoid write to backing-store
   --> DONE
-- Optimization 102: Modified bit for deciding to store/not in BS
-- Optimization 103: LRU DLL for optimised page replacement algo
+- Optimization 102: Modified bit for DATA deciding to store/not in BS
+- Optimization 103: FIFO for optimised page replacement algo
+- Optimization 104: Global replacement
 
