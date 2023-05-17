@@ -197,5 +197,5 @@ uint*           walkpgdir(pde_t *pgdir, const void *va, int alloc);
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
 // demand_paging.c
-int handle_page_fault(uint);
-void bsinit(void);
+int             handle_page_fault(uint);
+void            bsinit(void);

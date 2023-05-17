@@ -8,27 +8,27 @@
 #include "elf.h"
 #include "spinlock.h"
 
-
 // ================== PAGE REPLACEMENT ALGORITHMS ================
 /* random number generator function
  * ref: https://stackoverflow.com/questions/1167253/implementation-of-rand
  */
 uint get_random_number(void) {
-   static unsigned int z1 = 12345, z2 = 12345, z3 = 12345, z4 = 12345;
-   unsigned int b;
-   b  = ((z1 << 6) ^ z1) >> 13;
-   z1 = ((z1 & 4294967294U) << 18) ^ b;
-   b  = ((z2 << 2) ^ z2) >> 27;
-   z2 = ((z2 & 4294967288U) << 2) ^ b;
-   b  = ((z3 << 13) ^ z3) >> 21;
-   z3 = ((z3 & 4294967280U) << 7) ^ b;
-   b  = ((z4 << 3) ^ z4) >> 12;
-   z4 = ((z4 & 4294967168U) << 13) ^ b;
-   return (z1 ^ z2 ^ z3 ^ z4);
+  static unsigned int z1 = 12345, z2 = 12345, z3 = 12345, z4 = 12345;
+  unsigned int b;
+  b  = ((z1 << 6) ^ z1) >> 13;
+  z1 = ((z1 & 4294967294U) << 18) ^ b;
+  b  = ((z2 << 2) ^ z2) >> 27;
+  z2 = ((z2 & 4294967288U) << 2) ^ b;
+  b  = ((z3 << 13) ^ z3) >> 21;
+  z3 = ((z3 & 4294967280U) << 7) ^ b;
+  b  = ((z4 << 3) ^ z4) >> 12;
+  z4 = ((z4 & 4294967168U) << 13) ^ b;
+  return (z1 ^ z2 ^ z3 ^ z4);
 }
 
-// get victim page (virtual address)
-uint get_victim_index() {
+// get victim page index
+static inline uint
+get_victim_index() {
   return get_random_number() % MAXUSERPAGES;
 }
 
@@ -39,12 +39,10 @@ uint get_victim_index() {
 // 3. Backing store table --> bitmap
 
 // TODO: backing-store "bit"map
-
 struct bs {
   int bitmap[BSNPAGES];
   struct spinlock lock;
 } bs;
-
 
 // initialize backing-store bitmap
 void
@@ -75,39 +73,34 @@ get_locked_freepage_bs()
       break;
     }
   }
-  if (i == BSNPAGES) {
-    panic("get_locked_freepage_bs: No space in backing-store\n");
-  }
-
+  
   release(&bs.lock);
+
+  if (i == BSNPAGES)
+    panic("get_locked_freepage_bs: No space in backing-store\n");
+
   return i;
 }
 
 int
 get_pgidx_bs(uint va)
 {
-  struct proc *curproc;
   int i;
+  struct proc *curproc;
 
   curproc = myproc();
-  for (i = 0; i < MAXUSERPAGES; i++) {
-    if (curproc->bspgs[i][0] == va && curproc->bspgs[i][1] != -1) {
+  for (i = 0; i < MAXUSERPAGES; i++)
+    if (curproc->bspgs[i][0] == va && curproc->bspgs[i][1] != -1)
       return i;
-    }
-  }
   return -1;
 }
 
 // ================= PAGE FAULT HANDLER ================
 
-// TODO: Search on how to differentiate between text and data
-enum program_section {INVALID, TEXT, DATA, GUARD, STACK, HEAP};
-
 // read page storing virtual address from backing-store
 void
 read_page_bs(uint va, int bsidx)
 {
-  int i;
   struct proc *curproc;
 
   curproc = myproc();
@@ -127,16 +120,17 @@ read_page_bs(uint va, int bsidx)
   return;
 }
 
+// TODO: Search on how to differentiate between code and data
+enum program_section {INVALID, CODE, DATA, GUARD, STACK, HEAP};
+
 int
 get_phidx(struct proc *proc, uint va)
 {
   int i, idx = 0;
 
-  for (i = 0; i < proc->procelf.phnum; i++) {
-    if (proc->procelf.pelf[i].elfstart <= va) {
+  for (i = 0; i < proc->procelf.phnum; i++)
+    if (proc->procelf.pelf[i].elfstart <= va)
       idx = i;
-    }
-  }
   return idx;
 }
 
@@ -160,7 +154,7 @@ get_address_section(uint va)
   }
   else if (elfstart <= va && va < KERNBASE) {
     if (va < elfsize)
-      res = TEXT;
+      res = CODE;
     else if (va < elfmemsize)
       res = DATA;
     else if (va < PGROUNDUP(elfmemsize) + PGSIZE)
@@ -198,8 +192,8 @@ load_page(uint va)
     loadsize = elfsize - va;
   // Get inode
   elfip = iget(curproc->procinode.idev, curproc->procinode.inum);
-  ilock(elfip);
   // load the page
+  ilock(elfip);
   pa = UV2P(curproc->pgdir, va);
   readi(elfip, P2V(pa), elfoff + va, loadsize);
   iunlock(elfip);
@@ -210,7 +204,8 @@ load_page(uint va)
 }
 
 // write victim page to backing store
-void write_bs(uint victim) {
+void
+write_bs(uint victim) {
   int i, freepageidx;
   struct proc *curproc;
 
@@ -229,15 +224,16 @@ void write_bs(uint victim) {
       break;
     }
   }
-  if (i == MAXUSERPAGES) {
+
+  if (i == MAXUSERPAGES)
     panic("assign_page: process's backing store table is full\n");
-  }
 
   return;
 }
 
 // get victim page and update table of pages in RAM
-void free_ram_page() {
+void
+free_ram_page() {
   int vidx;
   uint victim;
   struct proc *curproc;
@@ -247,8 +243,10 @@ void free_ram_page() {
   vidx = get_victim_index();
   victim = curproc->rampgs[vidx];
   cprintf("Victim va: %x\n", victim);
-  if (get_address_section(victim) != TEXT)
+  // Optimization: Why to store CODE on bs, when it's accessible through ELF
+  if (get_address_section(victim) != CODE)
     write_bs(victim);
+
   kfree((char*)P2V(UV2P(curproc->pgdir, victim)));
   clearptep(curproc->pgdir, (char*)victim);
   curproc->rampgs[vidx] = -1;
@@ -290,9 +288,9 @@ assign_page(uint va)
       break;
     }
   }
-  if (i == MAXUSERPAGES) {
-      panic("MAXUSERPAGES full\n");
-  }
+
+  if (i == MAXUSERPAGES)
+    panic("MAXUSERPAGES full\n");
 
   return 0;
 }
@@ -302,21 +300,23 @@ print_rampgs(void)
 {
   int i;
   struct proc *curproc = myproc();
+
   cprintf("processname: %s, pid: %d\n", curproc->name, curproc->pid);
-  for (i = 0; i < MAXUSERPAGES; i++) {
+  for (i = 0; i < MAXUSERPAGES; i++)
     cprintf("va: %x\n", curproc->rampgs[i]);
-  }
+
   return;
 }
 
-// page fault handler
+// page fault handler, retval is kept int for condition checks
 int
 handle_page_fault(uint fault_va)
 {
   int bsidx;
   fault_va = PGROUNDDOWN(fault_va);
 
-  if (fault_va > KERNBASE) {
+  // location 1: Kernel space
+  if (fault_va >= KERNBASE) {
     cprintf("Page fault in kernel space\n");
     myproc()->killed = 1;
     return 0;
@@ -325,14 +325,13 @@ handle_page_fault(uint fault_va)
   // assign a page
   assign_page(fault_va);
 
-  //print_rampgs();
-  //cprintf("NUSERPAGES: %d\n", myproc()->nuserpages);
-
+  // location 2: backing-store
   if ((bsidx = get_pgidx_bs(fault_va)) >= 0) {
     read_page_bs(fault_va, bsidx);
     return 0;
   }
 
+  // location 3: elf
   switch (get_address_section(fault_va)) {
     case INVALID:
       cprintf("Page fault in kernel space\n");
@@ -343,15 +342,16 @@ handle_page_fault(uint fault_va)
       cprintf("Stack section loaded\n");
       break;
     case DATA:
-    case TEXT:
+    case CODE:
       // load the page
       load_page(fault_va);
-      cprintf("Text/Data section loaded\n");
+      cprintf("Code/Data section loaded\n");
       break;
   }
   return 0;
 }
 
+// print backing-store table
 int
 sys_bspages(void)
 {
@@ -359,7 +359,7 @@ sys_bspages(void)
 
   acquire(&bs.lock);
 
-  cprintf("*** BSPAGES BITMAP *** : ");
+  cprintf("BSPAGES BITMAP: ");
   for (i = 0; i < BSNPAGES; i++) {
     cprintf("%d", bs.bitmap[i]);
   }
@@ -371,7 +371,8 @@ sys_bspages(void)
 
 }
 
-int sys_rampages(void)
+int
+sys_rampages(void)
 {
   print_rampgs();
   return 0;
