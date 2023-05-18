@@ -114,10 +114,6 @@ Q3. How to read on a page fault?
   just assign and return
 - *NOTE*: In xv6, conceptually, only 1 stack page is allocated to each process
 
-Future TODOS:
-- 1. "bit" map :)
-- 2. clear bs bitmap locations of exiting process
-
 Further Optimizations:
 - Optimization 101: If page is of TEXT section, avoid write to backing-store
   --> DONE
