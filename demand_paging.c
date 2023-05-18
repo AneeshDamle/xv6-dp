@@ -38,9 +38,9 @@ get_victim_index() {
 // 2. Store virtual address, backing-store location for a process's pages
 // 3. Backing store table --> bitmap
 
-// TODO: backing-store "bit"map
-struct bs {
-  int bitmap[BSNPAGES];
+// global backing-store bitmap
+struct {
+  char bitmap[BSNPAGES / sizeof(char)];
   struct spinlock lock;
 } bs;
 
@@ -53,11 +53,46 @@ bsinit(void)
 
   acquire(&bs.lock);
 
-  for (i = 0; i < BSNPAGES; i++)
+  for (i = 0; i < BSNPAGES / sizeof(char); i++)
     bs.bitmap[i] = 0;
 
   release(&bs.lock);
   return;
+}
+
+// clear bit of backing-store bitmap
+void
+clear_bsbitmap_bit(int idx) {
+  int charpos = idx / sizeof(char);
+  int bitpos = sizeof(char) - idx % sizeof(char);
+  bs.bitmap[charpos] &= ~(1 << bitpos);
+  return;
+}
+
+// clears backing-store bit and handles locks too
+void
+clear_bsbitmap_bit_external(int idx) {
+  acquire(&bs.lock);
+  clear_bsbitmap_bit(idx);
+  release(&bs.lock);
+  return;
+}
+
+// fill bit of backing-store bitmap
+void
+fill_bsbitmap_bit(int idx) {
+  int charpos = idx / sizeof(char);
+  int bitpos = sizeof(char) - idx % sizeof(char);
+  bs.bitmap[charpos] |= (1 << bitpos);
+  return;
+}
+
+// check if bit of backing-store is cleared
+int
+is_bsbitmap_bit_clear(int idx) {
+  int charpos = idx / sizeof(char);
+  int bitpos = sizeof(char) - (idx % sizeof(char));
+  return !(bs.bitmap[charpos] & (1 << bitpos));
 }
 
 // return a free page from backing-store
@@ -68,8 +103,8 @@ get_locked_freepage_bs()
   acquire(&bs.lock);
 
   for (i = 0; i < BSNPAGES; i++) {
-    if (bs.bitmap[i] == 0) {
-      bs.bitmap[i] = 1;
+    if (is_bsbitmap_bit_clear(i)) {
+      fill_bsbitmap_bit(i);
       break;
     }
   }
@@ -111,7 +146,7 @@ read_page_bs(uint va, int bsidx)
 
   // update backing-store bitmap
   acquire(&bs.lock);
-  bs.bitmap[bsidx] = 0;
+  clear_bsbitmap_bit(bsidx);
   release(&bs.lock);
 
   // update table of pages in bs
@@ -360,7 +395,7 @@ sys_bspages(void)
   acquire(&bs.lock);
 
   cprintf("BSPAGES BITMAP: ");
-  for (i = 0; i < BSNPAGES; i++) {
+  for (i = 0; i < BSNPAGES / sizeof(char); i++) {
     cprintf("%d", bs.bitmap[i]);
   }
   cprintf("\n");

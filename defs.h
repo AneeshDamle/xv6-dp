@@ -199,3 +199,4 @@ uint*           walkpgdir(pde_t *pgdir, const void *va, int alloc);
 // demand_paging.c
 int             handle_page_fault(uint);
 void            bsinit(void);
+void            clear_bsbitmap_bit_external(int);

@@ -302,9 +302,14 @@ wait(void)
         kfree(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir);
+        // clear va entries of process pages of ram and bs
         int i;
         for (i = 0; i < MAXUSERPAGES; i++) {
           p->rampgs[i] = -1;
+          // clear backing-store bits
+          if (p->bspgs[i][1] != -1) {
+            clear_bsbitmap_bit_external(p->bspgs[i][1]);
+          }
           p->bspgs[i][0] = 0;
           p->bspgs[i][1] = -1;
         }
